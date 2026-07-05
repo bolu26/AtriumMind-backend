@@ -17,7 +17,8 @@
     "e2e": "tsx scripts/e2e-test.ts",
     "reconcile": "tsx scripts/reconcile.ts",
     "seed": "tsx scripts/seed.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "postinstall": "node -e \"const fs=require(\"fs\");fs.mkdirSync(\"node_modules/@atriumind\",{recursive:true});if(!fs.existsSync(\"node_modules/@atriumind/registry-client\"))fs.symlinkSync(process.cwd()+\"/packages/registry-client\",\"node_modules/@atriumind/registry-client\")\" || true"
   },
   "keywords": [
     "x402",
