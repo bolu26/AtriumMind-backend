@@ -2,12 +2,18 @@
   "name": "@atriumind/registry-client",
   "version": "0.1.0",
   "type": "module",
-  "main": "src/index.ts",
+  "main": "dist/index.js",
   "exports": {
-    ".": "./src/index.ts"
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    }
   },
   "dependencies": {
     "@stellar/stellar-sdk": "^15.0.1",
     "buffer": "^6.0.3"
+  },
+  "scripts": {
+    "build": "tsc --outDir dist --module NodeNext --moduleResolution NodeNext --target ES2022 --declaration --skipLibCheck --esModuleInterop src/index.ts src/networks.ts src/validateNetwork.ts 2>/dev/null || tsc --outDir dist --module CommonJS --target ES2022 --declaration --skipLibCheck --esModuleInterop src/index.ts src/networks.ts src/validateNetwork.ts"
   }
 }
