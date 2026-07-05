@@ -91,7 +91,9 @@ export function getNetworkPreset(network) {
 }
 
 export function networkPassphraseForX402(x402Network) {
-  const n = (x402Network ?? "").includes("pubnet") || (x402Network ?? "").includes("mainnet")
+  const v = (x402Network ?? "").toLowerCase().trim();
+  // Accept both bare names and prefixed forms
+  const n = (v === "mainnet" || v === "pubnet" || v === "stellar:pubnet" || v === "stellar:mainnet")
     ? "mainnet" : "testnet";
   return NETWORK_PRESETS[n].networkPassphrase;
 }
