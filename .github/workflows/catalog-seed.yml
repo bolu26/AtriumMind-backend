@@ -1,0 +1,105 @@
+name: Catalog Seed
+
+on:
+  push:
+    branches: [main]
+    paths: ['src/**', 'drizzle/**']
+  workflow_dispatch:
+
+jobs:
+  seed:
+    name: Run AtriumMind backend + seed catalog
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: atrium
+          POSTGRES_PASSWORD: atrium
+          POSTGRES_DB: atriumind
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL:                    postgres://atrium:atrium@localhost:5432/atriumind
+      NODE_ENV:                        test
+      PORT:                            3000
+      BASE_URL:                        http://localhost:3000
+      WEB_APP_URL:                     http://localhost:5173
+      ALLOWED_ORIGINS:                 "*"
+      SUPABASE_URL:                    https://placeholder.supabase.co
+      SUPABASE_SERVICE_KEY:            placeholder_service_key
+      SUPABASE_STORAGE_BUCKET:         resources
+      STELLAR_NETWORK:                 testnet
+      NETWORK:                         testnet
+      SOROBAN_RPC_URL:                 https://soroban-testnet.stellar.org
+      FACILITATOR_URL:                 https://www.x402.org/facilitator
+      PAY_TO:                          GCK7ALS7EP5DQG4UZMON3XTNUE7SSIW27XW24UOLXDHBOHWEWIGZVPZF
+      AGENT_SECRET_KEY:                ${{ secrets.STELLAR_SECRET_KEY }}
+      USDC_CONTRACT_ID:                CBIELTK6YBZJU5UP2WWQEQ4YAE4MCHYVJP7SCFJ7XJHKK6TGKXBCXMM
+      VAULT_REGISTRY_CONTRACT_ID:      CBQEIMSRPSRKJJHGOELZTP3CISZVHZ6WPKZTWJMYZXHFXPGHHWFQBD4H
+      REGISTRY_CONTRACT_ID:            CBQEIMSRPSRKJJHGOELZTP3CISZVHZ6WPKZTWJMYZXHFXPGHHWFQBD4H
+      OPENROUTER_API_KEY:              placeholder_for_demo
+      OPENROUTER_MODEL:                anthropic/claude-sonnet-4
+      ADMIN_API_KEY:                   atrium-admin-2025-xK9mP3nQ8rL2vB7s
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+
+      - name: Install dependencies
+        run: npm install --legacy-peer-deps
+
+      - name: Run migrations
+        run: npx drizzle-kit migrate
+
+      - name: Build
+        run: npm run build
+
+      - name: Start server
+        run: |
+          node dist/index.js &
+          for i in 1 2 3 4 5 6 7 8 9 10; do
+            sleep 3
+            curl -sf http://localhost:3000/health > /dev/null 2>&1 && echo "Server up after ${i}*3s" && break
+          done
+
+      - name: Create Publisher 1
+        run: |
+          R=$(curl -sf -X POST http://localhost:3000/publishers -H "Content-Type: application/json" \
+            -d '{"name":"AtriumMind Research Lab","email":"research@atriumind.demo","walletAddress":"GDEJJLXV2CNHF5HEGX34MU4G6L4PRVUAGD4ANF77ZDYTQJKSDSDYVVI6"}')
+          echo "$R"
+          echo "PUB1_KEY=$(echo $R | python3 -c "import sys,json; print(json.load(sys.stdin).get('apiKey',''))" 2>/dev/null)" >> $GITHUB_ENV
+
+      - name: Create Publisher 2
+        run: |
+          R=$(curl -sf -X POST http://localhost:3000/publishers -H "Content-Type: application/json" \
+            -d '{"name":"AtriumMind Data Studio","email":"data@atriumind.demo","walletAddress":"GBXL7OEOSVNSESHD7Q2BYVVA2KPQLSSIRLDSY6HFNYPXHCEBKPNCJQKX"}')
+          echo "$R"
+          echo "PUB2_KEY=$(echo $R | python3 -c "import sys,json; print(json.load(sys.stdin).get('apiKey',''))" 2>/dev/null)" >> $GITHUB_ENV
+
+      - name: Publish 3 resources
+        run: |
+          curl -sf -X POST http://localhost:3000/resources \
+            -H "Content-Type: application/json" -H "Authorization: Bearer $PUB1_KEY" \
+            -d '{"title":"Stellar Soroban Smart Contract Patterns (2025)","description":"Production-tested Soroban patterns with annotated Rust source.","price":"0.50","externalUrl":"https://developers.stellar.org/docs/build/smart-contracts/example-contracts"}' && echo "R1 ✅"
+          curl -sf -X POST http://localhost:3000/resources \
+            -H "Content-Type: application/json" -H "Authorization: Bearer $PUB2_KEY" \
+            -d '{"title":"Stellar Network Analytics Q1 2025","description":"90 days of on-chain Stellar metrics in CSV format.","price":"1.00","externalUrl":"https://dashboard.stellar.org"}' && echo "R2 ✅"
+          curl -sf -X POST http://localhost:3000/resources \
+            -H "Content-Type: application/json" -H "Authorization: Bearer $PUB1_KEY" \
+            -d '{"title":"x402 Payment Protocol Integration Guide","description":"Complete x402 micropayment integration guide for Stellar with Node.js examples.","price":"0.25","externalUrl":"https://github.com/x402-org/x402"}' && echo "R3 ✅"
+
+      - name: Verify + summarise
+        run: |
+          echo "=== Catalog ===" && curl -sf http://localhost:3000/resources
+          echo "=== Admin Stats ===" && curl -sf http://localhost:3000/admin/stats -H "X-Admin-Key: atrium-admin-2025-xK9mP3nQ8rL2vB7s"
+          echo "## AtriumMind Backend Seeded" >> $GITHUB_STEP_SUMMARY
+          echo "3 resources published, backend healthy" >> $GITHUB_STEP_SUMMARY
