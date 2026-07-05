@@ -40,3 +40,21 @@ router.get("/health/ready", async (_req, res) => {
 });
 
 export default router;
+
+// Temporary debug endpoint - shows DB error details
+router.get("/debug/db", async (_req, res) => {
+  try {
+    const { db } = await import("../db/client.js");
+    const { publishers, resources } = await import("../db/schema.js");
+    const { sql } = await import("drizzle-orm");
+    const result = await db.execute(sql`SELECT count(*) as cnt FROM publishers`);
+    const rcount = await db.execute(sql`SELECT count(*) as cnt FROM resources`);
+    res.json({ 
+      status: "db_ok",
+      publishers: result.rows[0],
+      resources: rcount.rows[0]
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message, stack: err.stack?.split('\n').slice(0,5) });
+  }
+});
