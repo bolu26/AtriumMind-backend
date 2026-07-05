@@ -5,7 +5,7 @@ import {
   listResources,
   networkPassphraseForX402,
   type Resource,
-} from "../../packages/registry-client/src/index.js";
+} from "../../packages/registry-client/dist/index.js";
 import { config } from "../config.js";
 import { getLogger } from "../lib/logger.js";
 
