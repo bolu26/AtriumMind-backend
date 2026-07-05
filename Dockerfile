@@ -1,13 +1,14 @@
 FROM node:20-alpine
 WORKDIR /app
 
-# registry-client has pre-compiled dist/index.js — no tsc needed: 1783292890
+# All imports fixed: 1783293139
+# registryClient.ts -> dist/index.js (pre-compiled JS, accepts bare testnet)
 COPY . .
 RUN npm install --legacy-peer-deps
 RUN mkdir -p node_modules/@atriumind && \
     rm -rf node_modules/@atriumind/registry-client && \
     cp -r packages/registry-client node_modules/@atriumind/registry-client && \
-    echo 'registry-client linked'
+    echo 'registry-client linked OK'
 RUN rm -rf dist && npm run build
 RUN addgroup -S atrium && adduser -S atrium -G atrium
 USER atrium
