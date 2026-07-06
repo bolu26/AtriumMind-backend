@@ -9,7 +9,6 @@ const POOL_WARN_THRESHOLD = 5;
 let totalConnections = 0;
 const seenConnections = new Set<number>();
 
-// Strip ?sslmode=require from URL — postgres.js handles SSL via the ssl option
 const dbUrl = config.DATABASE_URL.replace(/\?.*$/, "");
 const isLocal = dbUrl.includes("localhost") || dbUrl.includes("127.0.0.1");
 
@@ -18,19 +17,20 @@ const client = postgres(dbUrl, {
   max: 3,
   idle_timeout: 20,
   connect_timeout: 30,
-  debug(connId: number) {
-    if (!seenConnections.has(connId)) {
-      seenConnections.add(connId);
-      totalConnections++;
-      dbPoolTotal.set(totalConnections);
-    }
+  transform: { undefined: null },
+  debug: (_connId: number, query: string, params: unknown[]) => {
+    rootLogger.debug({ query: query.slice(0, 200), params }, "db query");
   },
-  onclose(connId: number) {
-    seenConnections.delete(connId);
-    totalConnections = seenConnections.size;
-    dbPoolTotal.set(totalConnections);
-    dbPoolIdle.set(Math.min(totalConnections, totalConnections));
+  onnotice: (notice: unknown) => {
+    rootLogger.warn({ notice }, "db notice");
   },
+});
+
+// Test connection on startup and log any errors
+client`SELECT current_database(), current_schema(), version()`.then((rows) => {
+  rootLogger.info({ db: rows[0] }, "DB connected successfully");
+}).catch((err: Error) => {
+  rootLogger.error({ err: { message: err.message, code: (err as any).code, detail: (err as any).detail } }, "DB connection test FAILED");
 });
 
 export const db = drizzle(client, { schema });
@@ -44,9 +44,6 @@ export function startPoolMetrics(intervalMs = 30_000): void {
     const total = totalConnections;
     const max = (client.options.max as number) ?? 10;
     rootLogger.info({ event: "db_pool_stats", total, max }, "DB pool stats");
-    if (total >= max - POOL_WARN_THRESHOLD) {
-      rootLogger.warn({ event: "db_pool_pressure", total, max }, "DB pool near capacity");
-    }
   }, intervalMs);
   poolLogInterval.unref?.();
 }
